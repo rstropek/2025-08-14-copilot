@@ -1,5 +1,6 @@
 import { open, Database } from 'sqlite';
 import sqlite3 from 'sqlite3';
+import { faker } from '@faker-js/faker';
 
 export type Customer = {
   id?: number;
@@ -76,53 +77,23 @@ export class SQLiteCustomerDB {
   async fillWithSampleData(): Promise<void> {
     const db = this.ensureConnected();
     
-    const sampleCustomers: Omit<Customer, 'id' | 'created_at'>[] = [
-      {
-        customer_number: 'CUST001',
-        name: 'John Smith',
-        email: 'john.smith@email.com',
-        city: 'New York',
-        country: 'USA',
-        age: 35,
-        balance: 2500.75
-      },
-      {
-        customer_number: 'CUST002',
-        name: 'Emma Johnson',
-        email: 'emma.johnson@email.com',
-        city: 'Los Angeles',
-        country: 'USA',
-        age: 28,
-        balance: 1850.00
-      },
-      {
-        customer_number: 'CUST003',
-        name: 'Michael Brown',
-        email: 'michael.brown@email.com',
-        city: 'London',
-        country: 'UK',
-        age: 42,
-        balance: 3200.50
-      },
-      {
-        customer_number: 'CUST004',
-        name: 'Sarah Davis',
-        email: 'sarah.davis@email.com',
-        city: 'Berlin',
-        country: 'Germany',
-        age: 31,
-        balance: 980.25
-      },
-      {
-        customer_number: 'CUST005',
-        name: 'David Wilson',
-        email: 'david.wilson@email.com',
-        city: 'Chicago',
-        country: 'USA',
-        age: 39,
-        balance: 4100.00
-      }
-    ];
+    // Generate 70 realistic customers using Faker.js
+    const sampleCustomers: Omit<Customer, 'id' | 'created_at'>[] = [];
+    
+    for (let i = 1; i <= 70; i++) {
+      const firstName = faker.person.firstName();
+      const lastName = faker.person.lastName();
+      
+      sampleCustomers.push({
+        customer_number: `CUST${i.toString().padStart(3, '0')}`,
+        name: `${firstName} ${lastName}`,
+        email: faker.internet.email({ firstName, lastName }).toLowerCase(),
+        city: faker.location.city(),
+        country: faker.location.country(),
+        age: faker.number.int({ min: 18, max: 80 }),
+        balance: parseFloat(faker.finance.amount({ min: 100, max: 10000, dec: 2 }))
+      });
+    }
 
     try {
       // Use transaction for atomicity
