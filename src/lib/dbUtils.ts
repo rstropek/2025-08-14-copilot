@@ -144,6 +144,19 @@ export class SQLiteCustomerDB {
   }
 
   /**
+   * Get all rows from a table with a given name
+   */
+  async getAllRows<T>(tableName: string): Promise<T[]> {
+    const db = this.ensureConnected();
+
+    try {
+      return await db.all(`SELECT * FROM ${tableName}`);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
    * Get all customers
    */
   async getAllCustomers(): Promise<Customer[]> {
