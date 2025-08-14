@@ -10,4 +10,4 @@ It must display all rows and columns in a table using CSS grid.
 
 It must implement paging (page size is 10 records).
 
-Keep styling to a minimum.  
+Keep styling to a minimum.

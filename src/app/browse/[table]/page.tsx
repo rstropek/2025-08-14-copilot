@@ -17,6 +17,7 @@ interface TableBrowserProps {
   };
   searchParams: {
     page?: string;
+    pageSize?: string;
   };
 }
 
@@ -40,6 +41,59 @@ function getColumnNames(data: Record<string, any>[]): string[] {
   return Object.keys(data[0]);
 }
 
+// Function to determine if a value is numeric
+function isNumeric(value: any): boolean {
+  return typeof value === 'number' || (!isNaN(parseFloat(value)) && isFinite(value));
+}
+
+// Function to determine if a value is a date/time
+function isDateTime(value: any): boolean {
+  if (!value) return false;
+  const dateValue = new Date(value);
+  return !isNaN(dateValue.getTime()) && (
+    // Check if it looks like a timestamp or ISO date string
+    typeof value === 'string' && (
+      value.includes('-') || value.includes('T') || value.includes(':')
+    )
+  );
+}
+
+// Function to format date/time values as ISO 8601
+function formatDateTime(value: any): string {
+  const date = new Date(value);
+  return date.toISOString();
+}
+
+// Function to analyze column types based on data
+function analyzeColumnTypes(data: Record<string, any>[]): Record<string, 'numeric' | 'datetime' | 'text'> {
+  const columnTypes: Record<string, 'numeric' | 'datetime' | 'text'> = {};
+  
+  if (data.length === 0) return columnTypes;
+  
+  const columns = Object.keys(data[0]);
+  
+  for (const column of columns) {
+    // Sample a few rows to determine type
+    const sampleValues = data.slice(0, Math.min(5, data.length)).map(row => row[column]);
+    
+    // Check if all sampled values are numeric
+    const allNumeric = sampleValues.every(value => value === null || value === undefined || value === '' || isNumeric(value));
+    
+    // Check if all sampled values are date/time (only if not numeric)
+    const allDateTime = !allNumeric && sampleValues.some(value => isDateTime(value));
+    
+    if (allNumeric) {
+      columnTypes[column] = 'numeric';
+    } else if (allDateTime) {
+      columnTypes[column] = 'datetime';
+    } else {
+      columnTypes[column] = 'text';
+    }
+  }
+  
+  return columnTypes;
+}
+
 function paginateData<T>(data: T[], page: number, pageSize: number): {
   paginatedData: T[];
   totalPages: number;
@@ -60,6 +114,7 @@ function paginateData<T>(data: T[], page: number, pageSize: number): {
 export default async function TableBrowserPage({ params, searchParams }: TableBrowserProps) {
   const { table } = params;
   const currentPage = parseInt(searchParams.page || '1', 10);
+  const pageSize = parseInt(searchParams.pageSize || PAGE_SIZE.toString(), 10);
 
   // Check if table is allowed
   if (!ALLOWED_TABLES.includes(table)) {
@@ -81,7 +136,8 @@ export default async function TableBrowserPage({ params, searchParams }: TableBr
   }
 
   const columns = getColumnNames(data);
-  const { paginatedData, totalPages, currentPage: validPage } = paginateData(data, currentPage, PAGE_SIZE);
+  const columnTypes = analyzeColumnTypes(data);
+  const { paginatedData, totalPages, currentPage: validPage } = paginateData(data, currentPage, pageSize);
 
   if (data.length === 0) {
     return (
@@ -100,6 +156,7 @@ export default async function TableBrowserPage({ params, searchParams }: TableBr
       
       <div className={styles.info}>
         Showing {paginatedData.length} of {data.length} records (Page {validPage} of {totalPages})
+        {pageSize !== PAGE_SIZE && <span> - Page size: {pageSize}</span>}
       </div>
 
       <div className={styles.tableContainer}>
@@ -111,18 +168,38 @@ export default async function TableBrowserPage({ params, searchParams }: TableBr
         >
           {/* Header row */}
           {columns.map((column) => (
-            <div key={column} className={styles.header}>
+            <div 
+              key={column} 
+              className={`${styles.header} ${columnTypes[column] === 'numeric' ? styles.rightAlign : ''}`}
+            >
               {column}
             </div>
           ))}
           
           {/* Data rows */}
           {paginatedData.map((row, rowIndex) => 
-            columns.map((column) => (
-              <div key={`${rowIndex}-${column}`} className={styles.cell}>
-                {row[column]?.toString() || ''}
-              </div>
-            ))
+            columns.map((column) => {
+              let displayValue = row[column]?.toString() || '';
+              
+              // Format datetime values
+              if (columnTypes[column] === 'datetime' && row[column]) {
+                try {
+                  displayValue = formatDateTime(row[column]);
+                } catch (error) {
+                  // If formatting fails, use original value
+                  displayValue = row[column]?.toString() || '';
+                }
+              }
+              
+              return (
+                <div 
+                  key={`${rowIndex}-${column}`} 
+                  className={`${styles.cell} ${columnTypes[column] === 'numeric' ? styles.rightAlign : ''}`}
+                >
+                  {displayValue}
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -132,7 +209,7 @@ export default async function TableBrowserPage({ params, searchParams }: TableBr
         <div className={styles.pagination}>
           {validPage > 1 && (
             <a 
-              href={`/browse/${table}?page=${validPage - 1}`}
+              href={`/browse/${table}?page=${validPage - 1}${pageSize !== PAGE_SIZE ? `&pageSize=${pageSize}` : ''}`}
               className={styles.pageLink}
             >
               Previous
@@ -145,7 +222,7 @@ export default async function TableBrowserPage({ params, searchParams }: TableBr
           
           {validPage < totalPages && (
             <a 
-              href={`/browse/${table}?page=${validPage + 1}`}
+              href={`/browse/${table}?page=${validPage + 1}${pageSize !== PAGE_SIZE ? `&pageSize=${pageSize}` : ''}`}
               className={styles.pageLink}
             >
               Next
